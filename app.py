@@ -167,5 +167,65 @@ if st.session_state.ability_self or st.session_state.ability_ai:
 else:
     st.info("レーダーチャートを表示するには自己評価かチャットが必要です。")
 
+from datetime import datetime, date
+import pandas as pd
+import openai
+
+# ✅ 週間ふりかえりレポート用セクション
+st.markdown("## 🗓️ 週間ふりかえりレポート")
+
+# 表示制御フラグ（セッション内で1日1回）
+if "report_shown_today" not in st.session_state:
+    st.session_state.report_shown_today = False
+
+# ログデータの整形
+if st.session_state.log:
+    df = pd.DataFrame(st.session_state.log)
+    df["日時"] = pd.to_datetime(df["日時"])
+    df = df.sort_values("日時")
+
+    # 🔎 今週のログ抽出（日曜〜土曜のログ）
+    today = datetime.today()
+    last_monday = today - pd.Timedelta(days=6)
+    df_lastweek = df[df["日時"] >= last_monday]
+
+    def generate_weekly_report(df_input):
+        logs = "\n".join(df_input["入力"].tolist())
+        prompt = f"""
+以下の1週間のユーザー発言から、以下の3つを出力してください。
+
+1. 📅 今週の要約（200文字以内）：感情・思考傾向の全体まとめ
+2. 💡 コメント（150文字以内）：変化や特徴に言及
+3. 🎯 一言アドバイス（50文字以内）：翌週に向けた提案
+
+【発言ログ】：
+{logs}
+        """
+        res = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return res.choices[0].message.content
+
+    # ✅ 毎週日曜に自動表示（1日1回）
+    if datetime.today().weekday() == 6 and not st.session_state.report_shown_today:
+        if not df_lastweek.empty:
+            st.markdown("### 📋 今週のふりかえりレポート（自動表示）")
+            summary = generate_weekly_report(df_lastweek)
+            st.success(summary)
+            st.session_state.report_shown_today = True
+
+    # ✅ 手動生成ボタン（いつでも使える）
+    if st.button("📝 手動でふりかえりレポートを生成"):
+        if not df_lastweek.empty:
+            st.markdown("### 📋 今週のふりかえりレポート")
+            summary = generate_weekly_report(df_lastweek)
+            st.success(summary)
+        else:
+            st.info("今週のログがまだありません。まずは内省を記録しましょう。")
+else:
+    st.info("ふりかえりレポートを生成するには、チャット履歴が必要です。")
+
+
 
 
