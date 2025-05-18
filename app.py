@@ -93,7 +93,34 @@ if st.session_state.log:
     df = df.sort_values("日時")
 
     # ▼ 日時から曜日を取り出して棒グラフにする（既存）
-    df["曜日"] = df["日時"].dt.day_name(locale='Japanese')
+    # 📅 英語の曜日名を取得し、日本語に変換（表示用のみ）
+df["曜日英語"] = df["日時"].dt.day_name()
+day_map = {
+    "Monday": "月",
+    "Tuesday": "火",
+    "Wednesday": "水",
+    "Thursday": "木",
+    "Friday": "金",
+    "Saturday": "土",
+    "Sunday": "日"
+}
+df["曜日"] = df["曜日英語"].map(day_map)
+
+# 表示順を維持するためカテゴリ化
+order = ["月", "火", "水", "木", "金", "土", "日"]
+df["曜日"] = pd.Categorical(df["曜日"], categories=order, ordered=True)
+
+# グラフ化
+weekly_avg = df.groupby("曜日", observed=True)["感情スコア"].mean().reset_index()
+chart = alt.Chart(weekly_avg).mark_bar().encode(
+    x=alt.X("曜日:N", title="曜日"),
+    y=alt.Y("感情スコア:Q", title="平均感情スコア"),
+    tooltip=["曜日", "感情スコア"]
+).properties(width=700, height=300)
+
+st.altair_chart(chart)
+
+    
     order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     df["曜日"] = pd.Categorical(df["曜日"], categories=order, ordered=True)
     weekly_avg = df.groupby("曜日", observed=True)["感情スコア"].mean().reset_index()
@@ -128,4 +155,6 @@ if st.session_state.log:
 
 else:
     st.info("まだ感情スコアのデータがありません。まずはチャットしてください。")
+
+
 
