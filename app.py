@@ -142,5 +142,76 @@ if st.session_state.log:
 else:
     st.info("まだ感情スコアのデータがありません。まずはチャットしてください。")
 
+import streamlit as st
+import openai
+import pandas as pd
+import plotly.graph_objects as go
+import os
+
+st.set_page_config(layout="wide")
+st.title("🧠 Re:Me 能力レーダーチャート（混合型）")
+
+# OpenAI APIキーの読み込み
+openai.api_key = st.secrets["OPENAI_API_KEY"] if "OPENAI_API_KEY" in st.secrets else "YOUR_API_KEY"
+
+# 能力カテゴリ
+categories = ["共感力", "論理力", "創造性", "行動力", "継続力", "自己認識"]
+
+# ユーザー入力：自己評価
+st.markdown("### 🌟 自己評価")
+user_scores = {}
+with st.form("self_eval"):
+    for cat in categories:
+        user_scores[cat] = st.slider(f"{cat}：", 0, 100, 50)
+    submitted = st.form_submit_button("評価を送信")
+
+# チャット履歴（仮にここでは固定文を使う）
+chat_history = st.text_area("📝 チャット履歴からAIに能力を推論させる（例：最近のやりとりを貼る）", "今日は友達の相談に乗っていて、共感しながら話を聞いた。...", height=150)
+
+# AIによる能力評価
+ai_scores = {cat: 50 for cat in categories}  # 初期値
+if st.button("🔍 AIに分析させる") and chat_history:
+    prompt = f"以下の文章から、次の6つの能力を100点満点で評価してください：{', '.join(categories)}。出力形式はCSVで：能力名,スコア\n文章：{chat_history}"
+    response = openai.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    csv_result = response.choices[0].message.content.strip().splitlines()
+    try:
+        for line in csv_result:
+            name, score = line.split(',')
+            ai_scores[name.strip()] = int(score.strip())
+    except:
+        st.warning("⚠️ AIの出力形式に問題がある可能性があります。")
+
+# レーダーチャート描画
+if submitted or any(v != 50 for v in ai_scores.values()):
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatterpolar(
+        r=[user_scores[cat] for cat in categories] + [user_scores[categories[0]]],
+        theta=categories + [categories[0]],
+        fill='toself',
+        name='自己評価',
+        line_color='blue'
+    ))
+
+    fig.add_trace(go.Scatterpolar(
+        r=[ai_scores[cat] for cat in categories] + [ai_scores[categories[0]]],
+        theta=categories + [categories[0]],
+        fill='toself',
+        name='AI評価',
+        line_color='orange'
+    ))
+
+    fig.update_layout(
+        polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+        showlegend=True,
+        title="🕸️ 能力プロファイル比較"
+    )
+    st.plotly_chart(fig)
+else:
+    st.info("自己評価かAI評価のどちらかを実行するとレーダーチャートが表示されます。")
+
 
 
