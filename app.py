@@ -73,7 +73,7 @@ if st.button("送信") and user_input:
     except:
         pass
 
-    st.experimental_rerun()
+    st.rerun()
 
 # チャット履歴表示
 for msg in st.session_state.messages[1:]:
