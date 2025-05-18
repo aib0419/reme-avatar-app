@@ -143,6 +143,8 @@ else:
     st.info("まだ感情スコアのデータがありません。まずはチャットしてください。")
 
 import streamlit as st
+st.set_page_config(layout="wide")  # ← 最初に配置する必要がある！
+
 import openai
 import pandas as pd
 import plotly.graph_objects as go
@@ -150,8 +152,6 @@ import streamlit.components.v1 as components
 from datetime import datetime
 import os
 import csv
-
-st.set_page_config(layout="wide")  # ← 最初に配置する必要がある！
 
 st.title("🧠 Re:Me - 自己内省AI with 3Dアバター & 能力レーダー")
 
