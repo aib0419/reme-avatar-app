@@ -13,17 +13,21 @@ st.title("🧠 Re:Me – 自己内省AI with 3Dアバター & 感情記録")
 openai.api_key = st.secrets["OPENAI_API_KEY"] if "OPENAI_API_KEY" in st.secrets else "YOUR_API_KEY"
 
 # 🦊 3Dアバター表示（新モデル）
+import streamlit.components.v1 as components
+
 components.html("""
-<model-viewer src="avatar.glb"
+<model-viewer src="https://raw.githubusercontent.com/aib0419/reme-avatar-app/main/avatar.glb"
               alt="3D Avatar"
               auto-rotate
               camera-controls
-              style="width:100%; height:400px;">
+              style="width: 100%; height: 400px;">
 </model-viewer>
+
 <script type="module"
   src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js">
 </script>
 """, height=420)
+
 
 st.markdown("### 💬 AIとの内省チャット")
 
