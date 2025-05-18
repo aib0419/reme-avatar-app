@@ -91,35 +91,41 @@ if st.session_state.log:
     df = pd.DataFrame(st.session_state.log)
     df["日時"] = pd.to_datetime(df["日時"])
     df = df.sort_values("日時")
-    st.line_chart(df.set_index("日時")["感情スコア"])
+
+    # ▼ 日時から曜日を取り出して棒グラフにする（既存）
+    df["曜日"] = df["日時"].dt.day_name(locale='Japanese')
+    order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    df["曜日"] = pd.Categorical(df["曜日"], categories=order, ordered=True)
+    weekly_avg = df.groupby("曜日", observed=True)["感情スコア"].mean().reset_index()
+    chart = alt.Chart(weekly_avg).mark_bar().encode(
+        x=alt.X("曜日:N", title="曜日"),
+        y=alt.Y("感情スコア:Q", title="平均感情スコア"),
+        tooltip=["感情スコア"]
+    ).properties(width=700, height=300)
+    st.altair_chart(chart)
+
+    # ▼ 週ごとの平均
+    st.markdown("### 📊 週ごとの感情スコア（平均）")
+    df["週"] = df["日時"].dt.to_period("W").astype(str)
+    weekly = df.groupby("週", observed=True)["感情スコア"].mean().reset_index()
+    chart_week = alt.Chart(weekly).mark_bar().encode(
+        x=alt.X("週:N", title="週"),
+        y=alt.Y("感情スコア:Q", title="平均感情スコア"),
+        tooltip=["週", "感情スコア"]
+    ).properties(width=700, height=300)
+    st.altair_chart(chart_week)
+
+    # ▼ 月ごとの平均
+    st.markdown("### 📊 月ごとの感情スコア（平均）")
+    df["月"] = df["日時"].dt.to_period("M").astype(str)
+    monthly = df.groupby("月", observed=True)["感情スコア"].mean().reset_index()
+    chart_month = alt.Chart(monthly).mark_line(point=True).encode(
+        x=alt.X("月:N", title="月"),
+        y=alt.Y("感情スコア:Q", title="平均感情スコア"),
+        tooltip=["月", "感情スコア"]
+    ).properties(width=700, height=300)
+    st.altair_chart(chart_month)
+
 else:
     st.info("まだ感情スコアのデータがありません。まずはチャットしてください。")
-
-st.markdown("### 📊 週ごとの感情スコア（平均）")
-
-# 📅 週別平均グラフ
-df["週"] = df["日時"].dt.to_period("W").astype(str)
-weekly = df.groupby("週", observed=True)["感情スコア"].mean().reset_index()
-
-chart_week = alt.Chart(weekly).mark_bar().encode(
-    x=alt.X("週:N", title="週"),
-    y=alt.Y("感情スコア:Q", title="平均感情スコア"),
-    tooltip=["週", "感情スコア"]
-).properties(width=700, height=300)
-
-st.altair_chart(chart_week)
-
-# 📆 月別平均グラフ
-st.markdown("### 📊 月ごとの感情スコア（平均）")
-
-df["月"] = df["日時"].dt.to_period("M").astype(str)
-monthly = df.groupby("月", observed=True)["感情スコア"].mean().reset_index()
-
-chart_month = alt.Chart(monthly).mark_line(point=True).encode(
-    x=alt.X("月:N", title="月"),
-    y=alt.Y("感情スコア:Q", title="平均感情スコア"),
-    tooltip=["月", "感情スコア"]
-).properties(width=700, height=300)
-
-st.altair_chart(chart_month)
 
