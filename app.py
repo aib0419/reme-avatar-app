@@ -84,55 +84,41 @@ for msg in st.session_state.messages[1:]:
     speaker = "🧍‍♀️ あなた" if msg["role"] == "user" else "🤖 Re:Me"
     st.markdown(f"**{speaker}：** {msg['content']}")
 
-# 📈 感情スコアのグラフ表示
+import altair as alt
+
 st.markdown("### 📊 感情スコアの推移")
 
 if st.session_state.log:
+    # DataFrame化と整形
     df = pd.DataFrame(st.session_state.log)
     df["日時"] = pd.to_datetime(df["日時"])
     df = df.sort_values("日時")
 
-    # ▼ 日時から曜日を取り出して棒グラフにする（既存）
-    # 📅 英語の曜日名を取得し、日本語に変換（表示用のみ）
-df["曜日英語"] = df["日時"].dt.day_name()
-day_map = {
-    "Monday": "月",
-    "Tuesday": "火",
-    "Wednesday": "水",
-    "Thursday": "木",
-    "Friday": "金",
-    "Saturday": "土",
-    "Sunday": "日"
-}
-df["曜日"] = df["曜日英語"].map(day_map)
+    # 📈 感情スコア 時系列折れ線グラフ
+    st.markdown("#### 🔹 時系列の感情スコア推移")
+    st.line_chart(df.set_index("日時")["感情スコア"])
 
-# 表示順を維持するためカテゴリ化
-order = ["月", "火", "水", "木", "金", "土", "日"]
-df["曜日"] = pd.Categorical(df["曜日"], categories=order, ordered=True)
-
-# グラフ化
-weekly_avg = df.groupby("曜日", observed=True)["感情スコア"].mean().reset_index()
-chart = alt.Chart(weekly_avg).mark_bar().encode(
-    x=alt.X("曜日:N", title="曜日"),
-    y=alt.Y("感情スコア:Q", title="平均感情スコア"),
-    tooltip=["曜日", "感情スコア"]
-).properties(width=700, height=300)
-
-st.altair_chart(chart)
-
-    
-    order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    # 📊 曜日ごとの感情スコア（平均）
+    st.markdown("#### 🔹 曜日別の感情スコア（平均）")
+    df["曜日英語"] = df["日時"].dt.day_name()
+    day_map = {
+        "Monday": "月", "Tuesday": "火", "Wednesday": "水",
+        "Thursday": "木", "Friday": "金", "Saturday": "土", "Sunday": "日"
+    }
+    df["曜日"] = df["曜日英語"].map(day_map)
+    order = ["月", "火", "水", "木", "金", "土", "日"]
     df["曜日"] = pd.Categorical(df["曜日"], categories=order, ordered=True)
     weekly_avg = df.groupby("曜日", observed=True)["感情スコア"].mean().reset_index()
+
     chart = alt.Chart(weekly_avg).mark_bar().encode(
         x=alt.X("曜日:N", title="曜日"),
         y=alt.Y("感情スコア:Q", title="平均感情スコア"),
-        tooltip=["感情スコア"]
+        tooltip=["曜日", "感情スコア"]
     ).properties(width=700, height=300)
     st.altair_chart(chart)
 
-    # ▼ 週ごとの平均
-    st.markdown("### 📊 週ごとの感情スコア（平均）")
+    # 📊 週ごとの感情スコア（平均）
+    st.markdown("#### 🔹 週ごとの感情スコア（平均）")
     df["週"] = df["日時"].dt.to_period("W").astype(str)
     weekly = df.groupby("週", observed=True)["感情スコア"].mean().reset_index()
     chart_week = alt.Chart(weekly).mark_bar().encode(
@@ -142,8 +128,8 @@ st.altair_chart(chart)
     ).properties(width=700, height=300)
     st.altair_chart(chart_week)
 
-    # ▼ 月ごとの平均
-    st.markdown("### 📊 月ごとの感情スコア（平均）")
+    # 📈 月ごとの感情スコア（平均）
+    st.markdown("#### 🔹 月ごとの感情スコア（平均）")
     df["月"] = df["日時"].dt.to_period("M").astype(str)
     monthly = df.groupby("月", observed=True)["感情スコア"].mean().reset_index()
     chart_month = alt.Chart(monthly).mark_line(point=True).encode(
