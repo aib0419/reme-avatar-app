@@ -94,3 +94,32 @@ if st.session_state.log:
     st.line_chart(df.set_index("日時")["感情スコア"])
 else:
     st.info("まだ感情スコアのデータがありません。まずはチャットしてください。")
+
+st.markdown("### 📊 週ごとの感情スコア（平均）")
+
+# 📅 週別平均グラフ
+df["週"] = df["日時"].dt.to_period("W").astype(str)
+weekly = df.groupby("週", observed=True)["感情スコア"].mean().reset_index()
+
+chart_week = alt.Chart(weekly).mark_bar().encode(
+    x=alt.X("週:N", title="週"),
+    y=alt.Y("感情スコア:Q", title="平均感情スコア"),
+    tooltip=["週", "感情スコア"]
+).properties(width=700, height=300)
+
+st.altair_chart(chart_week)
+
+# 📆 月別平均グラフ
+st.markdown("### 📊 月ごとの感情スコア（平均）")
+
+df["月"] = df["日時"].dt.to_period("M").astype(str)
+monthly = df.groupby("月", observed=True)["感情スコア"].mean().reset_index()
+
+chart_month = alt.Chart(monthly).mark_line(point=True).encode(
+    x=alt.X("月:N", title="月"),
+    y=alt.Y("感情スコア:Q", title="平均感情スコア"),
+    tooltip=["月", "感情スコア"]
+).properties(width=700, height=300)
+
+st.altair_chart(chart_month)
+
