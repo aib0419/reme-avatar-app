@@ -146,72 +146,157 @@ import streamlit as st
 import openai
 import pandas as pd
 import plotly.graph_objects as go
+import streamlit.components.v1 as components
+from datetime import datetime
 import os
+import csv
 
-st.set_page_config(layout="wide")
-st.title("🧠 Re:Me 能力レーダーチャート（混合型）")
+st.set_page_config(layout="wide")  # ← 最初に配置する必要がある！
 
-# OpenAI APIキーの読み込み
-openai.api_key = st.secrets["OPENAI_API_KEY"] if "OPENAI_API_KEY" in st.secrets else "YOUR_API_KEY"
+st.title("🧠 Re:Me - 自己内省AI with 3Dアバター & 能力レーダー")
+
+# 🔒 OpenAI APIキー
+openai.api_key = st.secrets["OPENAI_API_KEY"]
+
+# 3Dアバター表示
+components.html("""
+<model-viewer src="avatar.glb"
+              alt="3D Avatar"
+              auto-rotate camera-controls
+              style="width:100%; height:400px;">
+</model-viewer>
+<script type="module"
+  src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js">
+</script>
+""", height=420)
+
+# セッション初期化
+if "messages" not in st.session_state:
+    st.session_state.messages = [{"role": "system", "content": "あなたは共感的な内省支援AIです。"}]
+if "log" not in st.session_state:
+    st.session_state.log = []
+if "ability_self" not in st.session_state:
+    st.session_state.ability_self = None
+if "ability_ai" not in st.session_state:
+    st.session_state.ability_ai = None
+
+# ユーザー入力
+st.markdown("### 💬 今日考えたこと・感じたことを話してみてください")
+user_input = st.text_input("入力してください", key="chat_input")
+
+if st.button("送信") and user_input:
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    response = openai.chat.completions.create(
+        model="gpt-4o",
+        messages=st.session_state.messages
+    )
+    reply = response.choices[0].message.content
+    st.session_state.messages.append({"role": "assistant", "content": reply})
+
+    # 感情スコア取得
+    emo_prompt = f"この文章のポジティブ度を100点満点で数値のみで答えてください：{user_input}"
+    emo_response = openai.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": emo_prompt}]
+    )
+    try:
+        score = int(''.join(filter(str.isdigit, emo_response.choices[0].message.content)))
+    except:
+        score = -1
+
+    now = datetime.now().isoformat()
+    st.session_state.log.append({"日時": now, "入力": user_input, "AI応答": reply, "感情スコア": score})
+    st.rerun()
+
+# チャット履歴表示
+for msg in st.session_state.messages[1:]:
+    role = "🧍‍♀️ あなた" if msg["role"] == "user" else "🤖 Re:Me"
+    st.markdown(f"**{role}：** {msg['content']}")
+
+# 感情スコアグラフ
+st.markdown("### 📊 感情スコアの推移")
+if st.session_state.log:
+    df = pd.DataFrame(st.session_state.log)
+    df["日時"] = pd.to_datetime(df["日時"])
+    df = df.sort_values("日時")
+    st.line_chart(df.set_index("日時")["感情スコア"])
+else:
+    st.info("まだ感情スコアのデータがありません。まずはチャットしてください。")
+
+# ✅ 混合型レーダーチャート
+st.markdown("### 🕸️ 能力レーダーチャート")
 
 # 能力カテゴリ
 categories = ["共感力", "論理力", "創造性", "行動力", "継続力", "自己認識"]
 
-# ユーザー入力：自己評価
-st.markdown("### 🌟 自己評価")
-user_scores = {}
-with st.form("self_eval"):
+# 自己評価スライダー
+if st.button("自己評価する"):
+    scores = []
     for cat in categories:
-        user_scores[cat] = st.slider(f"{cat}：", 0, 100, 50)
-    submitted = st.form_submit_button("評価を送信")
+        score = st.slider(f"{cat}", 0, 100, 50)
+        scores.append(score)
+    st.session_state.ability_self = scores
 
-# チャット履歴（仮にここでは固定文を使う）
-chat_history = st.text_area("📝 チャット履歴からAIに能力を推論させる（例：最近のやりとりを貼る）", "今日は友達の相談に乗っていて、共感しながら話を聞いた。...", height=150)
+# AI評価（チャットログがある場合のみ）
+if st.session_state.log:
+    summary_text = "\n".join([log["入力"] for log in st.session_state.log[-5:]])
+    ai_prompt = f"""
+あなたは自己内省支援AIです。
+以下のテキストを分析し、次の6項目の能力を100点満点で数値で評価してください。
 
-# AIによる能力評価
-ai_scores = {cat: 50 for cat in categories}  # 初期値
-if st.button("🔍 AIに分析させる") and chat_history:
-    prompt = f"以下の文章から、次の6つの能力を100点満点で評価してください：{', '.join(categories)}。出力形式はCSVで：能力名,スコア\n文章：{chat_history}"
-    response = openai.chat.completions.create(
+- 共感力
+- 論理力
+- 創造性
+- 行動力
+- 継続力
+- 自己認識
+
+フォーマットは例のようにJSONで出力してください：
+{{
+  "共感力": 70,
+  "論理力": 60,
+  ...
+}}
+
+入力文：
+{summary_text}
+"""
+    ai_response = openai.chat.completions.create(
         model="gpt-4o",
-        messages=[{"role": "user", "content": prompt}]
+        messages=[{"role": "user", "content": ai_prompt}]
     )
-    csv_result = response.choices[0].message.content.strip().splitlines()
+    import json, re
     try:
-        for line in csv_result:
-            name, score = line.split(',')
-            ai_scores[name.strip()] = int(score.strip())
+        json_text = re.search(r"\{[\s\S]*\}", ai_response.choices[0].message.content).group()
+        ai_scores = json.loads(json_text)
+        st.session_state.ability_ai = [ai_scores[cat] for cat in categories]
     except:
-        st.warning("⚠️ AIの出力形式に問題がある可能性があります。")
+        st.warning("AIによる能力評価の解析に失敗しました。")
 
 # レーダーチャート描画
-if submitted or any(v != 50 for v in ai_scores.values()):
+if st.session_state.ability_self or st.session_state.ability_ai:
     fig = go.Figure()
-
-    fig.add_trace(go.Scatterpolar(
-        r=[user_scores[cat] for cat in categories] + [user_scores[categories[0]]],
-        theta=categories + [categories[0]],
-        fill='toself',
-        name='自己評価',
-        line_color='blue'
-    ))
-
-    fig.add_trace(go.Scatterpolar(
-        r=[ai_scores[cat] for cat in categories] + [ai_scores[categories[0]]],
-        theta=categories + [categories[0]],
-        fill='toself',
-        name='AI評価',
-        line_color='orange'
-    ))
-
+    if st.session_state.ability_self:
+        fig.add_trace(go.Scatterpolar(
+            r=st.session_state.ability_self + [st.session_state.ability_self[0]],
+            theta=categories + [categories[0]],
+            fill='toself',
+            name="自己評価"
+        ))
+    if st.session_state.ability_ai:
+        fig.add_trace(go.Scatterpolar(
+            r=st.session_state.ability_ai + [st.session_state.ability_ai[0]],
+            theta=categories + [categories[0]],
+            fill='toself',
+            name="AI評価"
+        ))
     fig.update_layout(
         polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-        showlegend=True,
-        title="🕸️ 能力プロファイル比較"
+        showlegend=True
     )
     st.plotly_chart(fig)
 else:
-    st.info("自己評価かAI評価のどちらかを実行するとレーダーチャートが表示されます。")
+    st.info("レーダーチャートを表示するには自己評価かチャットが必要です。")
 
 
 
