@@ -7,7 +7,7 @@ import os
 import streamlit.components.v1 as components
 
 st.set_page_config(layout="wide")
-st.title("🧠 Re:Me – 自己内省AI with 3Dアバター & 感情記録")
+st.title("🧠 Re:Me – 自己内省AI")
 
 # 🔒 OpenAIキー（Streamlit CloudならSecrets管理が推奨）
 openai.api_key = st.secrets["OPENAI_API_KEY"] if "OPENAI_API_KEY" in st.secrets else "YOUR_API_KEY"
