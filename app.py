@@ -65,6 +65,7 @@ if st.button("送信") and user_input:
     reply = response.choices[0].message.content
     st.session_state.messages.append({"role": "assistant", "content": reply})
 
+
     # 感情スコア
     emo_prompt = f"この文章のポジティブ度を100点満点で数値のみで答えてください：{user_input}"
     emo_response = openai.chat.completions.create(
@@ -79,6 +80,16 @@ if st.button("送信") and user_input:
     now = datetime.now().isoformat()
     st.session_state.log.append({"日時": now, "入力": user_input, "AI応答": reply, "感情スコア": score})
     st.rerun()
+
+log_data = {
+    "date": now,
+    "user_input": user_input,
+    "ai_reply": reply,
+    "emotion_score": score
+}
+
+db.collection("reme_logs").add(log_data)  # ← Firestoreに追加
+
 
 # チャット履歴
 for msg in st.session_state.messages[1:]:
