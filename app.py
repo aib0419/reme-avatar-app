@@ -34,6 +34,18 @@ if "user_id" not in st.session_state:
 st.session_state.user_id = st.text_input("🧑 あなたの名前またはニックネームを入力してください", value=st.session_state.user_id)
 user_id = st.session_state.user_id.strip()
 
+# 🔍 Firestore 接続確認のためテスト保存
+if user_id and st.button("🔧 Firestoreにテスト保存"):
+    test_data = {
+        "text": "テスト保存",
+        "date": datetime.now().isoformat()
+    }
+    try:
+        db.collection("reme_logs").document(user_id).collection("logs").add(test_data)
+        st.success("✅ Firestore に正常に保存できました！Firebase Console を確認してみてください。")
+    except Exception as e:
+        st.error(f"❌ Firestore保存に失敗しました: {e}")
+
 # OpenAIキー
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 
