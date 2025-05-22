@@ -1,6 +1,4 @@
 # 修正済みの app.py 全文（ユーザーごとにログ保存）
-
-app_code = '''
 import streamlit as st
 st.set_page_config(layout="wide")
 
