@@ -18,7 +18,7 @@ from firebase_admin import credentials, firestore
 
 # Firebase Admin SDKの初期化
 if not firebase_admin._apps:
-    firebase_info = json.loads(st.secrets["firebase"])
+    firebase_info = st.secrets["firebase"]
     cred = credentials.Certificate(firebase_info)
     firebase_admin.initialize_app(cred)
 
