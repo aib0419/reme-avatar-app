@@ -147,7 +147,6 @@ if st.session_state.log:
     ).properties(width=700, height=300))
 else:
     st.info("まだ感情スコアのデータがありません。まずはチャットしてください。")
-'''
 
 
 # 🕸️ 混合型レーダーチャート
