@@ -151,8 +151,6 @@ else:
     st.info("まだ感情スコアのデータがありません。まずはチャットしてください。")
 '''
 
-import ace_tools as tools; tools.display_code(app_code, name="ReMe App (ユーザーごとにFirestore保存)")
-
 
 # 🕸️ 混合型レーダーチャート
 st.markdown("### 🕸️ 能力レーダーチャート")
