@@ -3,5 +3,5 @@ openai
 pandas
 plotly
 altair
-
+requirements.txt
 
