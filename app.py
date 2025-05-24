@@ -2,6 +2,11 @@
 import streamlit as st
 st.set_page_config(layout="wide")
 
+# 🔄 モード選択（通常／メモリアル）
+st.sidebar.title("モード選択")
+mode = st.sidebar.radio("使用モードを選択してください", ["通常モード", "メモリアルモード"])
+
+
 import openai
 import pandas as pd
 import plotly.graph_objects as go
@@ -24,6 +29,54 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
+if mode == "メモリアルモード":
+    st.title("🕊️ メモリアルモード - 故人との対話")
+
+    # 🔐 ユーザーIDを取得（例：故人の名前）
+    avatar_user_id = st.text_input("故人の名前（ユーザーID）を入力してください", key="memorial_user")
+    
+    if avatar_user_id:
+        # 🦊 3Dアバター表示
+        components.html("""<model-viewer src="https://raw.githubusercontent.com/aib0419/reme-avatar-app/main/avatar.glb"
+                          alt="3D Avatar" auto-rotate camera-controls
+                          style="width: 100%; height: 400px;">
+        </model-viewer>
+        <script type="module"
+        src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js">
+        </script>""", height=420)
+
+        st.markdown("### 💬 故人アバターと対話する")
+        visitor_input = st.text_input("メッセージを入力", key="memorial_chat")
+
+        if visitor_input:
+            # Firestoreからログ取得
+            logs_ref = db.collection("reme_logs").document(avatar_user_id).collection("logs")
+            logs = logs_ref.order_by("date", direction=firestore.Query.DESCENDING).limit(50).stream()
+            user_texts = [doc.to_dict().get("user_input", "") for doc in logs]
+            user_texts.reverse()
+
+            summary = "\n".join(user_texts)
+            memorial_prompt = f"""
+あなたは以下の文章から再構築された人格AIです。
+以下はあなたが生前に書いた内省的な発言ログです。
+
+[人格データ]:
+{summary}
+
+訪問者の問いかけに対して、あなたらしい文体・価値観で応答してください。
+
+[問いかけ]:
+{visitor_input}
+"""
+
+            reply = openai.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": memorial_prompt}]
+            ).choices[0].message.content
+
+            st.markdown(f"👤 **{avatar_user_id}：** {reply}")
+    
+    st.stop()  # ⚠️ 通常モードの処理を停止
 
 st.title("🧠 Re:Me – 自己内省AI")
 
