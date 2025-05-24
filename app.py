@@ -18,7 +18,8 @@ from firebase_admin import credentials, firestore
 
 # ✅ このまま使ってください（json.loads は不要）
 if not firebase_admin._apps:
-    cred = credentials.Certificate(st.secrets["firebase"])
+    firebase_info = dict(st.secrets["firebase"])  # ← ここが重要！
+    cred = credentials.Certificate(firebase_info)
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()
