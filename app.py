@@ -153,13 +153,22 @@ else:
 # 🕸️ 混合型レーダーチャート
 st.markdown("### 🕸️ 能力レーダーチャート")
 
+# 能力カテゴリ
 categories = ["共感力", "論理力", "創造性", "行動力", "継続力", "自己認識"]
 
-if st.button("自己評価する"):
-    st.session_state.ability_self = [st.slider(cat, 0, 100, 50) for cat in categories]
+# 日付ごとのスコア抽出
+df_log = pd.DataFrame(st.session_state.log)
+df_log["日時"] = pd.to_datetime(df_log["日時"])
+df_log["日付"] = df_log["日時"].dt.date
 
-if st.session_state.log:
-    text_summary = "\n".join([log["入力"] for log in st.session_state.log[-5:]])
+today = datetime.today().date()
+yesterday = today - pd.Timedelta(days=1)
+
+def extract_scores_by_date(target_date):
+    logs = df_log[df_log["日付"] == target_date]
+    if logs.empty:
+        return None
+    text = "\n".join(logs["入力"].tolist())
     prompt = f"""
 以下のテキストから、次の6つの能力を100点満点で評価してください。
 - 共感力・論理力・創造性・行動力・継続力・自己認識
@@ -168,7 +177,7 @@ JSON形式で：
 {{"共感力":70,"論理力":60,...}}
 
 テキスト：
-{text_summary}
+{text}
 """
     try:
         res = openai.chat.completions.create(
@@ -176,27 +185,30 @@ JSON形式で：
             messages=[{"role": "user", "content": prompt}]
         )
         json_text = re.search(r"\{[\s\S]*\}", res.choices[0].message.content).group()
-        ai_scores = json.loads(json_text)
-        st.session_state.ability_ai = [ai_scores[c] for c in categories]
+        scores = json.loads(json_text)
+        return [scores[c] for c in categories]
     except:
-        st.warning("AIによる能力評価の解析に失敗しました。")
+        return None
+
+today_scores = extract_scores_by_date(today)
+yesterday_scores = extract_scores_by_date(yesterday)
 
 # レーダーチャート描画
-if st.session_state.ability_self or st.session_state.ability_ai:
+if today_scores or yesterday_scores:
     fig = go.Figure()
-    if st.session_state.ability_self:
+    if today_scores:
         fig.add_trace(go.Scatterpolar(
-            r=st.session_state.ability_self + [st.session_state.ability_self[0]],
+            r=today_scores + [today_scores[0]],
             theta=categories + [categories[0]],
             fill='toself',
-            name="自己評価"
+            name="今日"
         ))
-    if st.session_state.ability_ai:
+    if yesterday_scores:
         fig.add_trace(go.Scatterpolar(
-            r=st.session_state.ability_ai + [st.session_state.ability_ai[0]],
+            r=yesterday_scores + [yesterday_scores[0]],
             theta=categories + [categories[0]],
             fill='toself',
-            name="AI評価"
+            name="昨日"
         ))
     fig.update_layout(
         polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
@@ -204,11 +216,8 @@ if st.session_state.ability_self or st.session_state.ability_ai:
     )
     st.plotly_chart(fig)
 else:
-    st.info("レーダーチャートを表示するには自己評価かチャットが必要です。")
+    st.info("比較できるデータがありません。まずは日記を記入してください。")
 
-from datetime import datetime, date
-import pandas as pd
-import openai
 
 # ✅ 週間ふりかえりレポート用セクション
 st.markdown("## 🗓️ 週間ふりかえりレポート")
