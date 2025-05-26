@@ -88,6 +88,19 @@ if "user_id" not in st.session_state:
 st.session_state.user_id = st.text_input("🧑 あなたの名前またはニックネームを入力してください", value=st.session_state.user_id)
 user_id = st.session_state.user_id.strip()
 
+# Firestore からログを復元（セッションに）
+if "log_loaded" not in st.session_state:
+    st.session_state.log_loaded = True
+    st.session_state.log = []
+
+    try:
+        docs = db.collection("reme_logs").document(user_id).collection("logs").order_by("date").stream()
+        for doc in docs:
+            st.session_state.log.append(doc.to_dict())
+    except Exception as e:
+        st.warning(f"ログの取得に失敗しました: {e}")
+
+
 # 🔍 Firestore 接続確認のためテスト保存
 if user_id and st.button("🔧 Firestoreにテスト保存"):
     test_data = {
