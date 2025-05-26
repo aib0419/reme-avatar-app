@@ -211,8 +211,8 @@ categories = ["共感力", "論理力", "創造性", "行動力", "継続力", "
 
 # 日付ごとのスコア抽出
 df_log = pd.DataFrame(st.session_state.log)
-df_log["日時"] = pd.to_datetime(df_log["date"])
-df_log["日付"] = df_log["date"].dt.date
+df_log["日時"] = pd.to_datetime(df_log["日時"])
+df_log["日付"] = df_log["日時"].dt.date
 
 today = datetime.today().date()
 yesterday = today - pd.Timedelta(days=1)
