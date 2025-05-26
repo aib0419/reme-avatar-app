@@ -296,7 +296,7 @@ st.markdown("### 🕸️ 能力レーダーチャート")
 categories = ["共感力", "論理力", "創造性", "行動力", "継続力", "自己認識"]
 
 # 🔍 "日時" 変換処理（安全な変換）
-df_log = pd.DataFrame(st.session_state.log)
+df_log = pd.DataFrame(st.session_state.get("log", []))
 
 if "日時" in df_log.columns:
     df_log["日時"] = pd.to_datetime(df_log["日時"])
@@ -306,9 +306,8 @@ elif "date" in df_log.columns:
     df_log["日付"] = df_log["日時"].dt.date
 else:
     st.warning("ログに '日時' または 'date' の列がありません。")
-    df_log = pd.DataFrame()  # 空にする
+    df_log = pd.DataFrame()  # 空にしておく
 
-from datetime import datetime
 today = datetime.today().date()
 yesterday = today - pd.Timedelta(days=1)
 
@@ -341,10 +340,10 @@ JSON形式で：
         st.error(f"AI解析エラー: {e}")
         return None
 
+# 🔽 Firestoreログからスコア抽出してレーダーチャート描画（比較表示用）
 today_scores = extract_scores_by_date(today)
 yesterday_scores = extract_scores_by_date(yesterday)
 
-# 📊 レーダーチャート描画
 if today_scores or yesterday_scores:
     fig = go.Figure()
     if today_scores:
@@ -367,7 +366,8 @@ if today_scores or yesterday_scores:
     )
     st.plotly_chart(fig)
 else:
-    st.info("比較できるデータがありません。まずは日記を記入してください。")
+    st.info("レーダーチャートを表示するには、今日または昨日の記録が必要です。")
+
 
 
 
