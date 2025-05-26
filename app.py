@@ -29,56 +29,68 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-if mode == "メモリアルモード":
-    st.title("🕊️ メモリアルモード - 故人との対話")
+# -------------------------------
+# 🕊️ メモリアルモード：切替＆表示
+# -------------------------------
 
-    # 🔐 ユーザーIDを取得（例：故人の名前）
-    avatar_user_id = st.text_input("故人の名前（ユーザーID）を入力してください", key="memorial_user")
+# サイドバーにモード切替UI
+st.sidebar.markdown("## 🔁 モード切替")
+st.sidebar.markdown("このモードでは、日記記入者が故人となった後もアバターが会話をします。")
+memorial_mode = st.sidebar.checkbox("🕊️ メモリアルモード", key="memorial_mode")
 
+if memorial_mode:
+    st.markdown("## 🕊️ メモリアルモード")
+    st.info("このアバターは故人の記録をもとに生成された人格です。")
 
-    
-    if avatar_user_id:
-        # 🦊 3Dアバター表示
-        components.html("""<model-viewer src="https://raw.githubusercontent.com/aib0419/reme-avatar-app/main/avatar.glb"
-                          alt="3D Avatar" auto-rotate camera-controls
-                          style="width: 100%; height: 400px;">
-        </model-viewer>
-        <script type="module"
-        src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js">
-        </script>""", height=420)
+    # Firestoreからユーザーログを取得
+    if user_id:
+        try:
+            docs = db.collection("reme_logs").document(user_id).collection("logs").stream()
+            log_list = [doc.to_dict() for doc in docs]
+            df_log = pd.DataFrame(log_list)
 
-        st.markdown("### 💬 故人アバターと対話する")
-        visitor_input = st.text_input("メッセージを入力", key="memorial_chat")
+            # 🔽 日時列の変換（date または 日時）
+            if "日時" in df_log.columns:
+                df_log["日時"] = pd.to_datetime(df_log["日時"])
+            elif "date" in df_log.columns:
+                df_log["日時"] = pd.to_datetime(df_log["date"])
+            else:
+                st.warning("Firestoreのログに '日時' または 'date' の列が見つかりません。")
 
-        if visitor_input:
-            # Firestoreからログ取得
-            logs_ref = db.collection("reme_logs").document(avatar_user_id).collection("logs")
-            logs = logs_ref.order_by("date", direction=firestore.Query.DESCENDING).limit(50).stream()
-            user_texts = [doc.to_dict().get("user_input", "") for doc in logs]
-            user_texts.reverse()
+            # テキストログをまとめる（最新20件）
+            user_texts = df_log.sort_values("日時", ascending=False).head(20)["user_input"].tolist()
+            memory_summary = "\n".join(user_texts)
 
-            summary = "\n".join(user_texts)
-            memorial_prompt = f"""
-あなたは以下の文章から再構築された人格AIです。
-以下はあなたが生前に書いた内省的な発言ログです。
-
-[人格データ]:
-{summary}
-
-訪問者の問いかけに対して、あなたらしい文体・価値観で応答してください。
-
-[問いかけ]:
-{visitor_input}
+            # アバター人格の生成プロンプト
+            persona_prompt = f"""
+あなたは以下のログから再構成された人格です。
+口調・価値観・口癖を再現してください。回答は丁寧すぎず、自然体で。
+【過去のログ】:
+{memory_summary}
 """
+            st.session_state.messages = [{"role": "system", "content": persona_prompt}]
+            st.markdown("### 💬 故人アバターとの対話")
 
-            reply = openai.chat.completions.create(
-                model="gpt-4o",
-                messages=[{"role": "user", "content": memorial_prompt}]
-            ).choices[0].message.content
+            third_party_input = st.text_input("あなたの質問をどうぞ（第三者）", key="memorial_input")
 
-            st.markdown(f"👤 **{avatar_user_id}：** {reply}")
-    
-    st.stop()  # ⚠️ 通常モードの処理を停止
+            if st.button("アバターに聞く"):
+                if third_party_input:
+                    st.session_state.messages.append({"role": "user", "content": third_party_input})
+                    res = openai.chat.completions.create(
+                        model="gpt-4o",
+                        messages=st.session_state.messages
+                    )
+                    response_text = res.choices[0].message.content
+                    st.markdown(f"🧑‍💼 あなた：{third_party_input}")
+                    st.markdown(f"🕊️ アバター：{response_text}")
+                    st.session_state.messages.append({"role": "assistant", "content": response_text})
+                else:
+                    st.warning("質問を入力してください。")
+        except Exception as e:
+            st.error(f"Firestoreからのデータ取得に失敗しました: {e}")
+    else:
+        st.warning("ユーザー名（user_id）を入力してください。")
+
 
 st.title("🧠 Re:Me – 自己内省AI")
 
