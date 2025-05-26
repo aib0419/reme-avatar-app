@@ -35,36 +35,6 @@ if mode == "メモリアルモード":
     # 🔐 ユーザーIDを取得（例：故人の名前）
     avatar_user_id = st.text_input("故人の名前（ユーザーID）を入力してください", key="memorial_user")
 
-　　user_id = st.text_input("あなたの名前を入力してください", key="user_id").strip()
-
-if user_id:
-    # 🔁 Firestoreからセッションデータを復元
-    if not st.session_state.get("log"):
-        # 🔁 Firestoreから再読み込み（セッションが空の場合のみ）
-if user_id and not st.session_state.get("log"):
-    try:
-        docs = db.collection("reme_logs").document(user_id).collection("logs").order_by("date").stream()
-        st.session_state.log = [
-            {
-                "日時": doc.to_dict().get("date"),
-                "入力": doc.to_dict().get("user_input"),
-                "AI応答": doc.to_dict().get("ai_reply"),
-                "感情スコア": doc.to_dict().get("emotion_score")
-            }
-            for doc in docs
-        ]
-    except Exception as e:
-        st.error(f"Firestoreからの読み込みに失敗しました: {e}")
-
-    if user_id and not st.session_state.get("messages"):
-    st.session_state.messages = [{"role": "system", "content": "あなたは共感的な内省支援AIです。"}]
-    for item in st.session_state.log:
-        st.session_state.messages.append({"role": "user", "content": item["入力"]})
-        st.session_state.messages.append({"role": "assistant", "content": item["AI応答"]})
-
-
-
-    
     
     if avatar_user_id:
         # 🦊 3Dアバター表示
