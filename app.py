@@ -209,14 +209,6 @@ if user_id:
 else:
     st.warning("ユーザー名を入力してください。")
 
-# 📈 感情スコアのグラフ
-st.markdown("### 📊 感情スコアの推移")
-if not df_log.empty and "emotion_score" in df_log.columns:
-    st.line_chart(df_log.set_index("日時")["emotion_score"])
-else:
-    st.info("感情スコアのデータがまだありません。")
-
-
 
 # 📊 感情スコアグラフ
 st.markdown("### 📊 感情スコアの推移")
