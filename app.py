@@ -214,8 +214,15 @@ categories = ["共感力", "論理力", "創造性", "行動力", "継続力", "
 
 # 日付ごとのスコア抽出
 df_log = pd.DataFrame(st.session_state.log)
-df_log["日時"] = pd.to_datetime(df_log["日時"])
-df_log["日付"] = df_log["日時"].dt.date
+
+# 🔍 "日時" 変換処理（安全な変換）
+if "日時" in df_log.columns:
+    df_log["日時"] = pd.to_datetime(df_log["日時"])
+elif "date" in df_log.columns:
+    df_log["日時"] = pd.to_datetime(df_log["date"])
+else:
+    st.warning("ログに '日時' または 'date' の列がありません。")
+    df_log = pd.DataFrame()
 
 today = datetime.today().date()
 yesterday = today - pd.Timedelta(days=1)
