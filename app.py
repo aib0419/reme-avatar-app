@@ -205,29 +205,31 @@ if st.session_state.log:
 else:
     st.info("まだ感情スコアのデータがありません。まずはチャットしてください。")
 
-
-# 🕸️ 混合型レーダーチャート
+# 🕸️ 能力レーダーチャート
 st.markdown("### 🕸️ 能力レーダーチャート")
 
-# 能力カテゴリ
 categories = ["共感力", "論理力", "創造性", "行動力", "継続力", "自己認識"]
 
-# 日付ごとのスコア抽出
+# 🔍 "日時" 変換処理（安全な変換）
 df_log = pd.DataFrame(st.session_state.log)
 
-# 🔍 "日時" 変換処理（安全な変換）
 if "日時" in df_log.columns:
     df_log["日時"] = pd.to_datetime(df_log["日時"])
+    df_log["日付"] = df_log["日時"].dt.date
 elif "date" in df_log.columns:
     df_log["日時"] = pd.to_datetime(df_log["date"])
+    df_log["日付"] = df_log["日時"].dt.date
 else:
     st.warning("ログに '日時' または 'date' の列がありません。")
-    df_log = pd.DataFrame()
+    df_log = pd.DataFrame()  # 空にする
 
+from datetime import datetime
 today = datetime.today().date()
 yesterday = today - pd.Timedelta(days=1)
 
 def extract_scores_by_date(target_date):
+    if df_log.empty or "日付" not in df_log.columns or "入力" not in df_log.columns:
+        return None
     logs = df_log[df_log["日付"] == target_date]
     if logs.empty:
         return None
@@ -249,14 +251,15 @@ JSON形式で：
         )
         json_text = re.search(r"\{[\s\S]*\}", res.choices[0].message.content).group()
         scores = json.loads(json_text)
-        return [scores[c] for c in categories]
-    except:
+        return [scores.get(c, 0) for c in categories]
+    except Exception as e:
+        st.error(f"AI解析エラー: {e}")
         return None
 
 today_scores = extract_scores_by_date(today)
 yesterday_scores = extract_scores_by_date(yesterday)
 
-# レーダーチャート描画
+# 📊 レーダーチャート描画
 if today_scores or yesterday_scores:
     fig = go.Figure()
     if today_scores:
@@ -280,6 +283,7 @@ if today_scores or yesterday_scores:
     st.plotly_chart(fig)
 else:
     st.info("比較できるデータがありません。まずは日記を記入してください。")
+
 
 
 # ✅ 週間ふりかえりレポート用セクション
