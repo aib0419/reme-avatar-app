@@ -34,6 +34,15 @@ if mode == "メモリアルモード":
 
     # 🔐 ユーザーIDを取得（例：故人の名前）
     avatar_user_id = st.text_input("故人の名前（ユーザーID）を入力してください", key="memorial_user")
+
+    # "日時" という列がなければ、"date" を代わりに使って変換する
+if "日時" in df_log.columns:
+    df_log["日時"] = pd.to_datetime(df_log["日時"])
+elif "date" in df_log.columns:
+    df_log["日時"] = pd.to_datetime(df_log["date"])
+else:
+    st.warning("Firestoreのログに '日時' または 'date' の列が見つかりません。")
+
     
     if avatar_user_id:
         # 🦊 3Dアバター表示
