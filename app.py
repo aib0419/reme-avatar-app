@@ -210,20 +210,24 @@ else:
     st.warning("ユーザー名を入力してください。")
 
 
-# 🔍 感情スコア カラー強調グラフ
-st.markdown("#### 🎨 感情スコア（色で感情の強さを表示）")
+if not df.empty:
+    df = df.sort_values("日時")
 
-color_chart = alt.Chart(df).mark_circle(size=100).encode(
-    x=alt.X("日時:T", title="日時"),
-    y=alt.Y("emotion_score:Q", title="感情スコア", scale=alt.Scale(domain=[0, 100])),
-    color=alt.Color("emotion_score:Q", scale=alt.Scale(scheme="redyellowgreen"), legend=None),
-    tooltip=["日時:T", "emotion_score:Q"]
-) + alt.Chart(df).mark_line().encode(
-    x="日時:T",
-    y="emotion_score:Q"
-)
+    # 🎨 感情スコア カラー強調グラフ（NEW）
+    st.markdown("#### 🎨 感情スコア（色で感情の強さを表示）")
 
-st.altair_chart(color_chart.properties(width=700, height=300))
+    color_chart = alt.Chart(df).mark_circle(size=100).encode(
+        x=alt.X("日時:T", title="日時"),
+        y=alt.Y("emotion_score:Q", title="感情スコア", scale=alt.Scale(domain=[0, 100])),
+        color=alt.Color("emotion_score:Q", scale=alt.Scale(scheme="redyellowgreen"), legend=None),
+        tooltip=["日時:T", "emotion_score:Q"]
+    ) + alt.Chart(df).mark_line().encode(
+        x="日時:T",
+        y="emotion_score:Q"
+    )
+
+    st.altair_chart(color_chart.properties(width=700, height=300))
+
 
 
 # Firestoreから全履歴を取得
