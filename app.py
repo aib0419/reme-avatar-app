@@ -168,15 +168,62 @@ if st.button("送信"):
 for msg in st.session_state.messages[1:]:
     role = "🧍‍♀️ あなた" if msg["role"] == "user" else "🤖 Re:Me"
     st.markdown(f"**{role}：** {msg['content']}")
+    
+# 🔍 Firestoreからユーザー別ログを取得してDataFrame化
+df_log = pd.DataFrame()
+
+if user_id:
+    try:
+        docs = db.collection("reme_logs").document(user_id).collection("logs").stream()
+        records = [doc.to_dict() for doc in docs]
+
+        if records:
+            df_log = pd.DataFrame(records)
+
+            if "date" in df_log.columns:
+                df_log["日時"] = pd.to_datetime(df_log["date"])
+            elif "日時" in df_log.columns:
+                df_log["日時"] = pd.to_datetime(df_log["日時"])
+            else:
+                st.warning("ログに 'date' や '日時' がありません。")
+                df_log = pd.DataFrame()
+                
+            df_log = df_log.sort_values("日時")
+        else:
+            st.info("Firestoreに保存されたログがまだありません。")
+
+    except Exception as e:
+        st.error(f"Firestore読み込みエラー: {e}")
+else:
+    st.warning("ユーザー名を入力してください。")
+
+# 📈 感情スコアのグラフ
+st.markdown("### 📊 感情スコアの推移")
+if not df_log.empty and "emotion_score" in df_log.columns:
+    st.line_chart(df_log.set_index("日時")["emotion_score"])
+else:
+    st.info("感情スコアのデータがまだありません。")
+
+
 
 # 📊 感情スコアグラフ
 st.markdown("### 📊 感情スコアの推移")
-if st.session_state.log:
-    df = pd.DataFrame(st.session_state.log)
+
+if not df_log.empty:
+    df = df_log.copy()
+
+    # Firestoreのカラム名が英語の場合、整形
+    if "emotion_score" in df.columns:
+        df.rename(columns={"emotion_score": "感情スコア"}, inplace=True)
+    if "date" in df.columns:
+        df.rename(columns={"date": "日時"}, inplace=True)
     df["日時"] = pd.to_datetime(df["日時"])
     df = df.sort_values("日時")
+
+    # 📈 折れ線グラフ
     st.line_chart(df.set_index("日時")["感情スコア"])
 
+    # 🔹 曜日別平均
     df["曜日英語"] = df["日時"].dt.day_name()
     day_map = {"Monday": "月", "Tuesday": "火", "Wednesday": "水", "Thursday": "木", "Friday": "金", "Saturday": "土", "Sunday": "日"}
     df["曜日"] = df["曜日英語"].map(day_map)
@@ -189,6 +236,7 @@ if st.session_state.log:
         x="曜日:N", y="感情スコア:Q", tooltip=["曜日", "感情スコア"]
     ).properties(width=700, height=300))
 
+    # 🔹 週ごと平均
     st.markdown("#### 🔹 週ごと平均")
     df["週"] = df["日時"].dt.to_period("W").astype(str)
     weekly = df.groupby("週", observed=True)["感情スコア"].mean().reset_index()
@@ -196,6 +244,7 @@ if st.session_state.log:
         x="週:N", y="感情スコア:Q", tooltip=["週", "感情スコア"]
     ).properties(width=700, height=300))
 
+    # 🔹 月ごと平均
     st.markdown("#### 🔹 月ごと平均")
     df["月"] = df["日時"].dt.to_period("M").astype(str)
     monthly = df.groupby("月", observed=True)["感情スコア"].mean().reset_index()
@@ -204,6 +253,9 @@ if st.session_state.log:
     ).properties(width=700, height=300))
 else:
     st.info("まだ感情スコアのデータがありません。まずはチャットしてください。")
+
+
+
 
 # 🕸️ 能力レーダーチャート
 st.markdown("### 🕸️ 能力レーダーチャート")
