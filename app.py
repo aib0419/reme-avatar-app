@@ -32,12 +32,6 @@ db = firestore.client()
 # -------------------------------
 # 🕊️ メモリアルモード：切替＆表示
 # -------------------------------
-
-# サイドバーにモード切替UI
-st.sidebar.markdown("## 🔁 モード切替")
-st.sidebar.markdown("このモードでは、日記記入者が故人となった後もアバターが会話をします。")
-memorial_mode = st.sidebar.checkbox("🕊️ メモリアルモード", key="memorial_mode")
-
 if memorial_mode:
     st.markdown("## 🕊️ メモリアルモード")
     st.info("このアバターは故人の記録をもとに生成された人格です。")
