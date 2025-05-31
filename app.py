@@ -210,8 +210,7 @@ else:
     st.warning("ユーザー名を入力してください。")
 
 
-if not df.empty:
-    df = df.sort_values("日時")
+
 
 # 📊 感情スコアグラフ（カラー強調バージョン）
 st.markdown("### 📊 感情スコアの推移")
