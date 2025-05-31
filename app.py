@@ -378,13 +378,15 @@ if user_id:
             yesterday = today - pd.Timedelta(days=1)
 
             def extract_scores_by_date(target_date):
-                if df_log.empty or "日付" not in df_log.columns or "user_input" not in df_log.columns:
-                    return None
-                logs = df_log[df_log["日付"] == target_date]
-                if logs.empty:
-                    return None
-                text = "\n".join(logs["user_input"].tolist())
-                prompt = f"""
+    if df_log.empty or "日付" not in df_log.columns or "user_input" not in df_log.columns:
+        return None
+    logs = df_log[df_log["日付"] == target_date]
+    if logs.empty:
+        return None
+    # 🔧 文字列変換 + NaN除外
+    text = "\n".join([str(x) for x in logs["user_input"].tolist() if pd.notna(x)])
+    
+    prompt = f"""
 以下のテキストから、次の6つの能力を100点満点で評価してください。
 - 共感力・論理力・創造性・行動力・継続力・自己認識
 
@@ -394,17 +396,18 @@ JSON形式で：
 テキスト：
 {text}
 """
-                try:
-                    res = openai.chat.completions.create(
-                        model="gpt-4o",
-                        messages=[{"role": "user", "content": prompt}]
-                    )
-                    json_text = re.search(r"\{[\s\S]*\}", res.choices[0].message.content).group()
-                    scores = json.loads(json_text)
-                    return [scores.get(c, 0) for c in categories]
-                except Exception as e:
-                    st.error(f"AI解析エラー: {e}")
-                    return None
+    try:
+        res = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        json_text = re.search(r"\{[\s\S]*\}", res.choices[0].message.content).group()
+        scores = json.loads(json_text)
+        return [scores.get(c, 0) for c in categories]
+    except Exception as e:
+        st.error(f"AI解析エラー: {e}")
+        return None
+
 
             today_scores = extract_scores_by_date(today)
             yesterday_scores = extract_scores_by_date(yesterday)
