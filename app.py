@@ -377,7 +377,7 @@ if user_id:
             today = datetime.today().date()
             yesterday = today - pd.Timedelta(days=1)
 
-            def extract_scores_by_date(target_date):
+def extract_scores_by_date(target_date):
     if df_log.empty or "日付" not in df_log.columns or "user_input" not in df_log.columns:
         return None
     logs = df_log[df_log["日付"] == target_date]
