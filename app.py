@@ -215,129 +215,88 @@ else:
 # 📊 感情スコアグラフ（カラー強調バージョン）
 st.markdown("### 📊 感情スコアの推移")
 
-# まず、空のDataFrameを用意しておく（必ず df が存在するようにする）
 df = pd.DataFrame()
 
 if user_id:
     try:
-        # Firestoreから全履歴を取得
         docs = db.collection("reme_logs").document(user_id).collection("logs").stream()
         all_logs = [doc.to_dict() for doc in docs]
 
         if all_logs:
-            # DataFrame化
             df = pd.DataFrame(all_logs)
-
-            # 🔧 重複列削除
             df = df.loc[:, ~df.columns.duplicated()]
-
-            # 🔍 "日時" 変換処理（"date" 列がある場合にも対応）
             if "日時" in df.columns:
                 df["日時"] = pd.to_datetime(df["日時"])
             elif "date" in df.columns:
                 df["日時"] = pd.to_datetime(df["date"])
             else:
                 st.warning("ログに '日時' または 'date' の列がありません。")
-                # df を空に戻す
                 df = pd.DataFrame()
-
         else:
             st.info("まだFirestoreにデータがありません。")
-            # df は空のまま
-            df = pd.DataFrame()
-
     except Exception as e:
         st.error(f"データ取得時にエラーが発生しました: {e}")
-        # df は空のまま
-        df = pd.DataFrame()
 else:
     st.info("ユーザー名を入力すると、あなた専用の感情スコアグラフが表示されます。")
-    # df は空のまま
 
-# ▼▼ ここからは df が必ず定義されている ▼▼
-
-# カラムチェック：emotion_score があるか確認
+# ▼▼ 表示処理 ▼▼
 if not df.empty and "emotion_score" in df.columns:
-    # ソートしてから表示用に整形
     df = df.sort_values("日時")
-    # 0～100 の範囲に限定しておく（万一範囲外のデータがあれば除外）
     df = df[df["emotion_score"].between(0, 100)]
 
-    # ───【旧：st.line_chart】─────────────────────────────────────────
-    # st.line_chart(df.set_index("日時")["emotion_score"])
-    # ─────────────────────────────────────────────────────────────────
-
-    # 🎨 感情スコア カラー強調グラフ
+    # 🎨 カラー強調グラフ
     st.markdown("#### 🎨 感情スコア（色で感情の強さを表示）")
-
     color_chart = alt.Chart(df).mark_circle(size=100).encode(
         x=alt.X("日時:T", title="日時"),
         y=alt.Y("emotion_score:Q", title="感情スコア", scale=alt.Scale(domain=[0, 100])),
-        color=alt.Color(
-            "emotion_score:Q",
-            scale=alt.Scale(scheme="redyellowgreen"),
-            legend=None
-        ),
+        color=alt.Color("emotion_score:Q", scale=alt.Scale(scheme="redyellowgreen"), legend=None),
         tooltip=["日時:T", "emotion_score:Q"]
     ) + alt.Chart(df).mark_line().encode(
-        x="日時:T",
-        y="emotion_score:Q"
+        x="日時:T", y="emotion_score:Q"
     )
+    st.altair_chart(color_chart.properties(width=700, height=300), use_container_width=True)
 
-    st.altair_chart(
-        color_chart.properties(width=700, height=300),
-        use_container_width=True
-    )
+    # 🔽 折りたたみで分析表示
+    with st.expander("📅 曜日・週・月ごとの感情スコア平均"):
+        # 曜日処理
+        df["曜日英語"] = df["日時"].dt.day_name()
+        day_map = {
+            "Monday": "月", "Tuesday": "火", "Wednesday": "水",
+            "Thursday": "木", "Friday": "金", "Saturday": "土", "Sunday": "日"
+        }
+        df["曜日"] = df["曜日英語"].map(day_map)
+        order = ["月", "火", "水", "木", "金", "土", "日"]
+        df["曜日"] = pd.Categorical(df["曜日"], categories=order, ordered=True)
 
-    # ───【以下、曜日別／週別／月別平均を表示】──────────────────────────
+        # 🔹 曜日別
+        st.markdown("#### 🔹 曜日別 平均")
+        weekly_avg = df.groupby("曜日", observed=True)["emotion_score"].mean().reset_index()
+        st.altair_chart(alt.Chart(weekly_avg).mark_bar().encode(
+            x="曜日:N", y="emotion_score:Q", tooltip=["曜日", "emotion_score"]
+        ).properties(width=300, height=200))
 
-    # 曜日処理
-    df["曜日英語"] = df["日時"].dt.day_name()
-    day_map = {
-        "Monday": "月", "Tuesday": "火", "Wednesday": "水",
-        "Thursday": "木", "Friday": "金", "Saturday": "土", "Sunday": "日"
-    }
-    df["曜日"] = df["曜日英語"].map(day_map)
-    order = ["月", "火", "水", "木", "金", "土", "日"]
-    df["曜日"] = pd.Categorical(df["曜日"], categories=order, ordered=True)
+        # 🔹 週ごと
+        st.markdown("#### 🔹 週ごと平均")
+        df["週"] = df["日時"].dt.to_period("W").astype(str)
+        weekly = df.groupby("週", observed=True)["emotion_score"].mean().reset_index()
+        st.altair_chart(alt.Chart(weekly).mark_bar().encode(
+            x="週:N", y="emotion_score:Q", tooltip=["週", "emotion_score"]
+        ).properties(width=300, height=200))
 
-    # 🔹 曜日別 平均
-    st.markdown("#### 🔹 曜日別 平均")
-    weekly_avg = df.groupby("曜日", observed=True)["emotion_score"].mean().reset_index()
-    st.altair_chart(
-        alt.Chart(weekly_avg).mark_bar().encode(
-            x="曜日:N",
-            y="emotion_score:Q",
-            tooltip=["曜日", "emotion_score"]
-        ).properties(width=700, height=300)
-    )
-
-    # 🔹 週ごと平均
-    st.markdown("#### 🔹 週ごと平均")
-    df["週"] = df["日時"].dt.to_period("W").astype(str)
-    weekly = df.groupby("週", observed=True)["emotion_score"].mean().reset_index()
-    st.altair_chart(
-        alt.Chart(weekly).mark_bar().encode(
-            x="週:N",
-            y="emotion_score:Q",
-            tooltip=["週", "emotion_score"]
-        ).properties(width=700, height=300)
-    )
-
-    # 🔹 月ごと平均
-    st.markdown("#### 🔹 月ごと平均")
-    df["月"] = df["日時"].dt.to_period("M").astype(str)
-    monthly = df.groupby("月", observed=True)["emotion_score"].mean().reset_index()
-    st.altair_chart(
-        alt.Chart(monthly).mark_line(point=True).encode(
-            x="月:N",
-            y="emotion_score:Q",
-            tooltip=["月", "emotion_score"]
-        ).properties(width=700, height=300)
-    )
+        # 🔹 月ごと
+        st.markdown("#### 🔹 月ごと平均")
+        df["月"] = df["日時"].dt.to_period("M").astype(str)
+        monthly = df.groupby("月", observed=True)["emotion_score"].mean().reset_index()
+        st.altair_chart(alt.Chart(monthly).mark_line(point=True).encode(
+            x="月:N", y="emotion_score:Q", tooltip=["月", "emotion_score"]
+        ).properties(width=300, height=200))
 
 else:
     st.info("表示できる感情スコアのデータがありません。")
+
+
+
+
 
 
 
