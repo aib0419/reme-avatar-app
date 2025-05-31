@@ -339,42 +339,52 @@ if not df.empty and "emotion_score" in df.columns:
 else:
     st.info("表示できる感情スコアのデータがありません。")
 
- 
 
 
+import re, json
+import plotly.graph_objects as go
+from datetime import datetime
+import pandas as pd
 
-
-
-
-# 🕸️ 能力レーダーチャート
 st.markdown("### 🕸️ 能力レーダーチャート")
 
 categories = ["共感力", "論理力", "創造性", "行動力", "継続力", "自己認識"]
 
-# 🔍 "日時" 変換処理（安全な変換）
-df_log = pd.DataFrame(st.session_state.get("log", []))
+# Firestoreからログ取得
+if user_id:
+    try:
+        docs = db.collection("reme_logs").document(user_id).collection("logs").stream()
+        all_logs = [doc.to_dict() for doc in docs]
 
-if "日時" in df_log.columns:
-    df_log["日時"] = pd.to_datetime(df_log["日時"])
-    df_log["日付"] = df_log["日時"].dt.date
-elif "date" in df_log.columns:
-    df_log["日時"] = pd.to_datetime(df_log["date"])
-    df_log["日付"] = df_log["日時"].dt.date
-else:
-    st.warning("ログに '日時' または 'date' の列がありません。")
-    df_log = pd.DataFrame()  # 空にしておく
+        if all_logs:
+            df_log = pd.DataFrame(all_logs)
 
-today = datetime.today().date()
-yesterday = today - pd.Timedelta(days=1)
+            # 🔧 重複列削除
+            df_log = df_log.loc[:, ~df_log.columns.duplicated()]
 
-def extract_scores_by_date(target_date):
-    if df_log.empty or "日付" not in df_log.columns or "入力" not in df_log.columns:
-        return None
-    logs = df_log[df_log["日付"] == target_date]
-    if logs.empty:
-        return None
-    text = "\n".join(logs["入力"].tolist())
-    prompt = f"""
+            # 🔍 日時変換
+            if "日時" in df_log.columns:
+                df_log["日時"] = pd.to_datetime(df_log["日時"])
+            elif "date" in df_log.columns:
+                df_log["日時"] = pd.to_datetime(df_log["date"])
+            else:
+                st.warning("ログに '日時' または 'date' の列がありません。")
+                df_log = pd.DataFrame()
+
+            df_log["日付"] = df_log["日時"].dt.date
+
+            # 日付指定
+            today = datetime.today().date()
+            yesterday = today - pd.Timedelta(days=1)
+
+            def extract_scores_by_date(target_date):
+                if df_log.empty or "日付" not in df_log.columns or "user_input" not in df_log.columns:
+                    return None
+                logs = df_log[df_log["日付"] == target_date]
+                if logs.empty:
+                    return None
+                text = "\n".join(logs["user_input"].tolist())
+                prompt = f"""
 以下のテキストから、次の6つの能力を100点満点で評価してください。
 - 共感力・論理力・創造性・行動力・継続力・自己認識
 
@@ -384,45 +394,59 @@ JSON形式で：
 テキスト：
 {text}
 """
-    try:
-        res = openai.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        json_text = re.search(r"\{[\s\S]*\}", res.choices[0].message.content).group()
-        scores = json.loads(json_text)
-        return [scores.get(c, 0) for c in categories]
+                try:
+                    res = openai.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[{"role": "user", "content": prompt}]
+                    )
+                    json_text = re.search(r"\{[\s\S]*\}", res.choices[0].message.content).group()
+                    scores = json.loads(json_text)
+                    return [scores.get(c, 0) for c in categories]
+                except Exception as e:
+                    st.error(f"AI解析エラー: {e}")
+                    return None
+
+            today_scores = extract_scores_by_date(today)
+            yesterday_scores = extract_scores_by_date(yesterday)
+
+            if today_scores or yesterday_scores:
+                fig = go.Figure()
+                if today_scores:
+                    fig.add_trace(go.Scatterpolar(
+                        r=today_scores + [today_scores[0]],
+                        theta=categories + [categories[0]],
+                        fill='toself',
+                        name="今日"
+                    ))
+                if yesterday_scores:
+                    fig.add_trace(go.Scatterpolar(
+                        r=yesterday_scores + [yesterday_scores[0]],
+                        theta=categories + [categories[0]],
+                        fill='toself',
+                        name="昨日"
+                    ))
+                fig.update_layout(
+                    polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+                    showlegend=True
+                )
+                st.plotly_chart(fig)
+            else:
+                st.info("レーダーチャートを表示するには、今日または昨日の記録が必要です。")
+
+        else:
+            st.info("Firestoreに記録がありません。")
+
     except Exception as e:
-        st.error(f"AI解析エラー: {e}")
-        return None
-
-# 🔽 Firestoreログからスコア抽出してレーダーチャート描画（比較表示用）
-today_scores = extract_scores_by_date(today)
-yesterday_scores = extract_scores_by_date(yesterday)
-
-if today_scores or yesterday_scores:
-    fig = go.Figure()
-    if today_scores:
-        fig.add_trace(go.Scatterpolar(
-            r=today_scores + [today_scores[0]],
-            theta=categories + [categories[0]],
-            fill='toself',
-            name="今日"
-        ))
-    if yesterday_scores:
-        fig.add_trace(go.Scatterpolar(
-            r=yesterday_scores + [yesterday_scores[0]],
-            theta=categories + [categories[0]],
-            fill='toself',
-            name="昨日"
-        ))
-    fig.update_layout(
-        polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-        showlegend=True
-    )
-    st.plotly_chart(fig)
+        st.error(f"データ取得時にエラーが発生しました: {e}")
 else:
-    st.info("レーダーチャートを表示するには、今日または昨日の記録が必要です。")
+    st.info("ユーザー名を入力すると、あなた専用の分析が表示されます。")
+
+
+
+
+
+
+
 
 
 
