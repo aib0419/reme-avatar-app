@@ -409,29 +409,49 @@ else:
 
 
 
-from datetime import datetime, timedelta, date
-import pandas as pd
-
 st.markdown("## 📆 週を選んでふりかえりレポート")
 
-if st.session_state.get("log"):
-    df = pd.DataFrame(st.session_state["log"])
-    df["日時"] = pd.to_datetime(df["日時"])
-    df = df.sort_values("日時")
+if user_id:
+    try:
+        # Firestoreからログ取得
+        docs = db.collection("reme_logs").document(user_id).collection("logs").stream()
+        all_logs = [doc.to_dict() for doc in docs]
 
-    # 週の開始日（日曜日）を選ぶカレンダーUI
+        if all_logs:
+            df = pd.DataFrame(all_logs)
+            df = df.loc[:, ~df.columns.duplicated()]
+
+            if "日時" in df.columns:
+                df["日時"] = pd.to_datetime(df["日時"])
+            elif "date" in df.columns:
+                df["日時"] = pd.to_datetime(df["date"])
+            else:
+                st.warning("ログに '日時' または 'date' の列がありません。")
+                df = pd.DataFrame()
+        else:
+            st.info("Firestoreにログがありません。")
+            df = pd.DataFrame()
+
+    except Exception as e:
+        st.error(f"Firestore取得エラー: {e}")
+        df = pd.DataFrame()
+else:
+    st.info("ユーザー名を入力してください。")
+    df = pd.DataFrame()
+
+# ▼▼ 以下は週選択とレポート生成 ▼▼
+if not df.empty:
+    # カレンダーUIで週を選ぶ
     today = date.today()
     default_sunday = today - timedelta(days=today.weekday() + 1)
-    selected_sunday = st.date_input("🔽 レポート対象の週（日曜日）を選択", value=default_sunday, format="YYYY-MM-DD")
+    selected_sunday = st.date_input("🔽 レポート対象の週（日曜日）", value=default_sunday, format="YYYY-MM-DD")
 
     week_start = selected_sunday
     week_end = selected_sunday + timedelta(days=6)
-
-    # フィルタリング
     df_week = df[(df["日時"].dt.date >= week_start) & (df["日時"].dt.date <= week_end)]
 
     def generate_weekly_report(df_input):
-        logs = "\n".join(df_input["入力"].dropna().astype(str).tolist())
+        logs = "\n".join(df_input["user_input"].dropna().astype(str).tolist())
         prompt = f"""
 以下の1週間のユーザー発言から、以下の3つを出力してください。
 
@@ -450,17 +470,11 @@ if st.session_state.get("log"):
 
     if st.button("📝 この週のレポートを生成"):
         if not df_week.empty:
-            st.markdown(f"### 🗓️ {week_start.strftime('%Y-%m-%d')}〜{week_end.strftime('%Y-%m-%d')} のレポート")
+            st.markdown(f"### 🗓️ {week_start}〜{week_end} のレポート")
             summary = generate_weekly_report(df_week)
             st.success(summary)
         else:
             st.info("この週の記録がありません。")
-else:
-    st.info("レポート生成には、ログデータが必要です。")
-
-
-
-
 
 
 
