@@ -244,7 +244,7 @@ if not df.empty and "emotion_score" in df.columns:
     df = df[df["emotion_score"].between(0, 100)]
 
     # 🎨 カラー強調グラフ
-    st.markdown("#### 🎨 感情スコア（色で感情の強さを表示）")
+    st.markdown("#### 🎨 感情スコア")
     color_chart = alt.Chart(df).mark_circle(size=100).encode(
         x=alt.X("日時:T", title="日時"),
         y=alt.Y("emotion_score:Q", title="感情スコア", scale=alt.Scale(domain=[0, 100])),
