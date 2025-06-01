@@ -409,33 +409,29 @@ else:
 
 
 
+from datetime import datetime, timedelta, date
+import pandas as pd
 
+st.markdown("## 📆 週を選んでふりかえりレポート")
 
-
-
-
-
-
-# ✅ 週間ふりかえりレポート用セクション
-st.markdown("## 🗓️ 週間ふりかえりレポート")
-
-# 表示制御フラグ（セッション内で1日1回）
-if "report_shown_today" not in st.session_state:
-    st.session_state.report_shown_today = False
-
-# ログデータの整形
-if st.session_state.log:
-    df = pd.DataFrame(st.session_state.log)
+if st.session_state.get("log"):
+    df = pd.DataFrame(st.session_state["log"])
     df["日時"] = pd.to_datetime(df["日時"])
     df = df.sort_values("日時")
 
-    # 🔎 今週のログ抽出（日曜〜土曜のログ）
-    today = datetime.today()
-    last_monday = today - pd.Timedelta(days=6)
-    df_lastweek = df[df["日時"] >= last_monday]
+    # 週の開始日（日曜日）を選ぶカレンダーUI
+    today = date.today()
+    default_sunday = today - timedelta(days=today.weekday() + 1)
+    selected_sunday = st.date_input("🔽 レポート対象の週（日曜日）を選択", value=default_sunday, format="YYYY-MM-DD")
+
+    week_start = selected_sunday
+    week_end = selected_sunday + timedelta(days=6)
+
+    # フィルタリング
+    df_week = df[(df["日時"].dt.date >= week_start) & (df["日時"].dt.date <= week_end)]
 
     def generate_weekly_report(df_input):
-        logs = "\n".join(df_input["入力"].tolist())
+        logs = "\n".join(df_input["入力"].dropna().astype(str).tolist())
         prompt = f"""
 以下の1週間のユーザー発言から、以下の3つを出力してください。
 
@@ -452,24 +448,20 @@ if st.session_state.log:
         )
         return res.choices[0].message.content
 
-    # ✅ 毎週日曜に自動表示（1日1回）
-    if datetime.today().weekday() == 6 and not st.session_state.report_shown_today:
-        if not df_lastweek.empty:
-            st.markdown("### 📋 今週のふりかえりレポート（自動表示）")
-            summary = generate_weekly_report(df_lastweek)
-            st.success(summary)
-            st.session_state.report_shown_today = True
-
-    # ✅ 手動生成ボタン（いつでも使える）
-    if st.button("📝 手動でふりかえりレポートを生成"):
-        if not df_lastweek.empty:
-            st.markdown("### 📋 今週のふりかえりレポート")
-            summary = generate_weekly_report(df_lastweek)
+    if st.button("📝 この週のレポートを生成"):
+        if not df_week.empty:
+            st.markdown(f"### 🗓️ {week_start.strftime('%Y-%m-%d')}〜{week_end.strftime('%Y-%m-%d')} のレポート")
+            summary = generate_weekly_report(df_week)
             st.success(summary)
         else:
-            st.info("今週のログがまだありません。まずは内省を記録しましょう。")
+            st.info("この週の記録がありません。")
 else:
-    st.info("ふりかえりレポートを生成するには、チャット履歴が必要です。")
+    st.info("レポート生成には、ログデータが必要です。")
+
+
+
+
+
 
 
 
