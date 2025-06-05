@@ -80,7 +80,7 @@ if mode == "メモリアルモード":
     st.stop()  # ⚠️ 通常モードの処理を停止
 
 
-st.title("🧠 Re:Me – 自己内省AI")
+st.title("🧠 Re:Me – 日記AI")
 
 # 🔐 ユーザーID入力
 if "user_id" not in st.session_state:
@@ -136,7 +136,7 @@ if not st.session_state.messages:
     st.session_state.messages = [{"role": "system", "content": "あなたは共感的な内省支援AIです。"}]
 
 # ユーザー入力
-st.markdown("### 💬 今日考えたこと・感じたことを話してみてください")
+st.markdown("### 💬 今日考えたこと・感じたこと・伝えたいことを話してみてください")
 user_input = st.text_input("入力してください", key="chat_input")
 
 if st.button("送信"):
