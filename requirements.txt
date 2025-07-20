@@ -4,4 +4,4 @@ pandas
 plotly
 altair
 firebase-admin
-
+web3
